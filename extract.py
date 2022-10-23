@@ -61,11 +61,13 @@ def extract_multiscale( net, img, detector, scale_f=2**0.25,
     assert max_scale <= 1
     s = 1.0 # current scale factor
     
+    level = 0
+    L = []
     X,Y,S,C,Q,D = [],[],[],[],[],[]
     while  s+0.001 >= max(min_scale, min_size / max(H,W)):
         if s-0.001 <= min(max_scale, max_size / max(H,W)):
             nh, nw = img.shape[2:]
-            if verbose: print(f"extracting at scale x{s:.02f} = {nw:4d}x{nh:3d}")
+            if verbose: print(f"extracting at scale x{s:.02f} = {nw:4d}x{nh:3d} - level {level}")
             # extract descriptors
             with torch.no_grad():
                 res = net(imgs=[img])
@@ -90,6 +92,12 @@ def extract_multiscale( net, img, detector, scale_f=2**0.25,
             C.append(c)
             Q.append(q)
             D.append(d)
+            
+            # L_tmp =level * np.ones(n,dtype=np.int32)
+            # L = np.concatenate((L, L_tmp), axis=0).astype(np.int32)           
+            L.append(level * torch.ones(n, dtype=torch.float32, device=d.device))     
+            level += 1
+            
         s /= scale_f
 
         # down-scale the image for next iteration
@@ -102,10 +110,11 @@ def extract_multiscale( net, img, detector, scale_f=2**0.25,
     Y = torch.cat(Y)
     X = torch.cat(X)
     S = torch.cat(S) # scale
+    L = torch.cat(L)
     scores = torch.cat(C) * torch.cat(Q) # scores = reliability * repeatability
-    XYS = torch.stack([X,Y,S], dim=-1)
+    XY_SCALE_SCORE_LEVEL = torch.stack([X,Y,S,scores,L], dim=-1)
     D = torch.cat(D)
-    return XYS, D, scores
+    return XY_SCALE_SCORE_LEVEL, D, scores
 
 
 def extract_keypoints(args):

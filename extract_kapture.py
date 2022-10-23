@@ -106,7 +106,7 @@ def extract_kapture_keypoints(args):
                 img = img.cuda()
 
             # extract keypoints/descriptors for a single image
-            xys, desc, scores = extract_multiscale(net, img, detector,
+            xy_scale_score_level, desc, scores = extract_multiscale(net, img, detector,
                                                    scale_f=args.scale_f,
                                                    min_scale=args.min_scale,
                                                    max_scale=args.max_scale,
@@ -114,18 +114,18 @@ def extract_kapture_keypoints(args):
                                                    max_size=args.max_size,
                                                    verbose=True)
 
-            xys = xys.cpu().numpy()
+            xy_scale_score_level = xy_scale_score_level.cpu().numpy()
             desc = desc.cpu().numpy()
             scores = scores.cpu().numpy()
             idxs = scores.argsort()[-args.top_k or None:]
 
-            xys = xys[idxs]
+            xy_scale_score_level = xy_scale_score_level[idxs]
             desc = desc[idxs]
             if keypoints_dtype is None or descriptors_dtype is None:
-                keypoints_dtype = xys.dtype
+                keypoints_dtype = xy_scale_score_level.dtype
                 descriptors_dtype = desc.dtype
 
-                keypoints_dsize = xys.shape[1]
+                keypoints_dsize = xy_scale_score_level.shape[1]
                 descriptors_dsize = desc.shape[1]
 
                 kdata.keypoints[args.keypoints_type] = kapture.Keypoints('r2d2', keypoints_dtype, keypoints_dsize)
@@ -141,17 +141,17 @@ def extract_kapture_keypoints(args):
                 keypoints_to_file(keypoints_config_absolute_path, kdata.keypoints[args.keypoints_type])
                 descriptors_to_file(descriptors_config_absolute_path, kdata.descriptors[args.descriptors_type])
             else:
-                assert kdata.keypoints[args.keypoints_type].dtype == xys.dtype
+                assert kdata.keypoints[args.keypoints_type].dtype == xy_scale_score_level.dtype
                 assert kdata.descriptors[args.descriptors_type].dtype == desc.dtype
-                assert kdata.keypoints[args.keypoints_type].dsize == xys.shape[1]
+                assert kdata.keypoints[args.keypoints_type].dsize == xy_scale_score_level.shape[1]
                 assert kdata.descriptors[args.descriptors_type].dsize == desc.shape[1]
                 assert kdata.descriptors[args.descriptors_type].keypoints_type == args.keypoints_type
                 assert kdata.descriptors[args.descriptors_type].metric_type == 'L2'
 
             keypoints_fullpath = get_keypoints_fullpath(args.keypoints_type, args.kapture_root,
                                                         image_name, tar_handlers)
-            print(f"Saving {xys.shape[0]} keypoints to {keypoints_fullpath}")
-            image_keypoints_to_file(keypoints_fullpath, xys)
+            print(f"Saving {xy_scale_score_level.shape[0]} keypoints to {keypoints_fullpath}")
+            image_keypoints_to_file(keypoints_fullpath, xy_scale_score_level)
             kdata.keypoints[args.keypoints_type].add(image_name)
 
             descriptors_fullpath = get_descriptors_fullpath(args.descriptors_type, args.kapture_root,
